@@ -1,0 +1,54 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    background-color: #F6F9FF;
+  }
+  body {
+    @apply bg-paper text-ink font-body antialiased;
+  }
+  ::selection {
+    @apply bg-stacks/20;
+  }
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply rounded-full bg-stacks/20;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-stacks/35;
+  }
+}
+
+@layer components {
+  .catalog-card {
+    @apply relative rounded-2xl border border-paper-line bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04),0_12px_28px_-14px_rgba(37,99,235,0.25)];
+  }
+
+  .stamp-badge {
+    @apply inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-mono font-medium tracking-wide;
+  }
+
+  .focus-ring {
+    @apply outline-none focus-visible:ring-2 focus-visible:ring-stacks focus-visible:ring-offset-2 focus-visible:ring-offset-paper;
+  }
+
+  .gradient-text {
+    @apply bg-hero-gradient bg-clip-text text-transparent;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
