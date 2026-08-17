@@ -16,6 +16,13 @@ export interface Book {
   available: number;
   isbn?: string;
   tags?: string[];
+  description?: string;
+  summary?: string;
+  imageUrl?: string;
+  coverImageUrl?: string;
+  coverUrl?: string;
+  thumbnailUrl?: string;
+  image?: string;
   note?: string;
   createdAt: string;
 }

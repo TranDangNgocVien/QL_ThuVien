@@ -1,12 +1,17 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
-import { useAuth } from "../context/AuthContext";
-import { useLoans } from "../hooks/useLoans";
-import { fetchMemberByUserId } from "../api/membersApi";
+import { useMyLoans } from "../hooks/useLoans";
 import { Button } from "../components/ui/button";
-import { getLoanDisplayStatus, type Loan, type LoanDisplayStatus } from "../types/loan";
+import { Dialog } from "../components/ui/dialog";
+import {
+  getLoanDisplayStatus,
+  getLoanItems,
+  getLoanTitleSummary,
+  getLoanTotalQuantity,
+  type Loan,
+  type LoanDisplayStatus,
+} from "../types/loan";
 
 const statusStyles: Record<LoanDisplayStatus, string> = {
   pending_borrow: "border-brass text-brass",
@@ -19,25 +24,16 @@ const statusStyles: Record<LoanDisplayStatus, string> = {
 
 export default function MyLoansPage() {
   const { t } = useTranslation();
-  const { user } = useAuth();
 
-  const memberQuery = useQuery({
-    queryKey: ["member-by-user", user?.id],
-    queryFn: () => fetchMemberByUserId(user!.id),
-    enabled: !!user,
-  });
-  const member = memberQuery.data ?? null;
-
-  const { loans, isLoading, requestReturnBook, isMutating } = useLoans({
-    memberId: member?.id,
-  });
-
-  const [returningId, setReturningId] = useState<string | null>(null);
+  // Dùng hook chuyên biệt cho độc giả, không cần query member thủ công
+  const { loans, isLoading, requestReturnBook, isMutating } = useMyLoans();
+  const [returningId, setReturningId] = useState<string | number | null>(null);
+  const [detailLoan, setDetailLoan] = useState<Loan | null>(null);
 
   const handleReturn = async (loan: Loan) => {
     setReturningId(loan.id);
     try {
-      await requestReturnBook(loan);
+      await requestReturnBook(loan.id);
       toast.success(t("myLoans.returnRequestSuccess"));
     } catch {
       toast.error(t("myLoans.returnError"));
@@ -55,7 +51,7 @@ export default function MyLoansPage() {
         <p className="text-sm text-ink/60">{t("myLoans.subtitle")}</p>
       </div>
 
-      {isLoading || memberQuery.isLoading ? (
+      {isLoading ? (
         <div className="catalog-card p-8 text-center text-sm text-ink/60">
           {t("table.loading")}
         </div>
@@ -103,13 +99,13 @@ export default function MyLoansPage() {
                     className="border-b border-dashed border-paper-line last:border-0 hover:bg-brass/5"
                   >
                     <td className="px-4 py-3 font-display font-medium text-ink">
-                      {loan.bookTitle}
+                      {getLoanTitleSummary(loan)}
                     </td>
                     <td className="hidden px-4 py-3 font-mono text-ink/70 sm:table-cell">
                       {new Date(loan.borrowDate).toLocaleDateString()}
                     </td>
                     <td className="px-4 py-3 text-center font-mono text-ink/70">
-                      {loan.quantity}
+                      {getLoanTotalQuantity(loan)}
                     </td>
                     <td className="px-4 py-3 font-mono text-ink/70">
                       {new Date(loan.dueDate).toLocaleDateString()}
@@ -142,6 +138,13 @@ export default function MyLoansPage() {
                             : t("myLoans.returnBook")}
                         </Button>
                       )}
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => setDetailLoan(loan)}
+                      >
+                        {t("loans.viewDetail")}
+                      </Button>
                     </td>
                   </tr>
                 );
@@ -150,6 +153,52 @@ export default function MyLoansPage() {
           </table>
         </div>
       )}
+
+      <Dialog
+        open={!!detailLoan}
+        onClose={() => setDetailLoan(null)}
+        title={t("loans.detailTitle")}
+      >
+        {detailLoan && (
+          <div className="space-y-4 text-sm">
+            <dl className="grid gap-3 sm:grid-cols-2">
+              <div className="rounded-lg border border-paper-line bg-paper p-3">
+                <dt className="text-xs font-medium uppercase text-ink/50">{t("loans.code")}</dt>
+                <dd className="mt-1 font-mono text-ink">{detailLoan.code ?? detailLoan.id}</dd>
+              </div>
+              <div className="rounded-lg border border-paper-line bg-paper p-3">
+                <dt className="text-xs font-medium uppercase text-ink/50">{t("myLoans.status")}</dt>
+                <dd className="mt-1">
+                  <span className={`stamp-badge ${statusStyles[getLoanDisplayStatus(detailLoan)]}`}>
+                    {t(`loanStatus.${getLoanDisplayStatus(detailLoan)}`)}
+                  </span>
+                </dd>
+              </div>
+              <div className="rounded-lg border border-paper-line bg-paper p-3">
+                <dt className="text-xs font-medium uppercase text-ink/50">{t("myLoans.borrowDate")}</dt>
+                <dd className="mt-1 font-mono text-ink">{new Date(detailLoan.borrowDate).toLocaleDateString()}</dd>
+              </div>
+              <div className="rounded-lg border border-paper-line bg-paper p-3">
+                <dt className="text-xs font-medium uppercase text-ink/50">{t("myLoans.dueDate")}</dt>
+                <dd className="mt-1 font-mono text-ink">{new Date(detailLoan.dueDate).toLocaleDateString()}</dd>
+              </div>
+            </dl>
+            <div className="rounded-xl border border-paper-line bg-white">
+              {getLoanItems(detailLoan).map((item) => (
+                <div
+                  key={`${item.bookId}-${item.id ?? ""}`}
+                  className="flex justify-between gap-3 border-b border-dashed border-paper-line px-4 py-3 last:border-0"
+                >
+                  <span className="font-display font-medium text-ink">{item.bookTitle}</span>
+                  <span className="font-mono text-ink/70">
+                    {t("myLoans.quantity")}: {item.quantity}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </Dialog>
     </div>
   );
 }

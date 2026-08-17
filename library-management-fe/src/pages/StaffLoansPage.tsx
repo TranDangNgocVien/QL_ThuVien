@@ -7,11 +7,20 @@ import { useLoans } from "../hooks/useLoans";
 import { useMembers } from "../hooks/useMembers";
 import { fetchAllBooks } from "../api/booksApi";
 import { Button } from "../components/ui/button";
-import { Select } from "../components/ui/select";
 import { Dialog } from "../components/ui/dialog";
 import { Input, Label } from "../components/ui/input";
-import { getLoanDisplayStatus, type Loan, type LoanDisplayStatus } from "../types/loan";
+import { startsWithSearch } from "../lib/search";
+import {
+  getLoanDisplayStatus,
+  getLoanItems,
+  getLoanTitleSummary,
+  getLoanTotalQuantity,
+  type Loan,
+  type LoanDisplayStatus,
+} from "../types/loan";
 import type { LoanQueryParams } from "../api/loansApi";
+
+const MAX_SLIP_BOOKS = 3;
 
 const statusStyles: Record<LoanDisplayStatus, string> = {
   pending_borrow: "border-brass text-brass",
@@ -34,6 +43,20 @@ function formatDate(value: string | null) {
   return value ? new Date(value).toLocaleDateString() : "-";
 }
 
+function idsEqual(left: string | number, right: string | number) {
+  return String(left) === String(right);
+}
+
+function toDateInputValue(date: Date) {
+  return date.toISOString().slice(0, 10);
+}
+
+function addDays(date: Date, days: number) {
+  const next = new Date(date);
+  next.setDate(next.getDate() + days);
+  return next;
+}
+
 export default function StaffLoansPage() {
   const { t } = useTranslation();
   const [statusFilter, setStatusFilter] =
@@ -42,14 +65,14 @@ export default function StaffLoansPage() {
   const {
     loans,
     isLoading,
-    createStaffLoan,
+    createStaffLoanSlip,
     approveBorrowBook,
     rejectBorrowBook,
     approveReturnBook,
     isMutating,
   } = useLoans({ status: statusFilter });
   const { members } = useMembers();
-  const activeMembers = members.filter((m) => m.status === "active");
+  const activeMembers = members.filter((m) => m.status.toLowerCase() === "active");
 
   const booksQuery = useQuery({ queryKey: ["all-books"], queryFn: fetchAllBooks });
   const availableBooks = useMemo(
@@ -59,31 +82,72 @@ export default function StaffLoansPage() {
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedMemberId, setSelectedMemberId] = useState("");
-  const [selectedBookId, setSelectedBookId] = useState("");
-  const [selectedQuantity, setSelectedQuantity] = useState(1);
-  const [busyId, setBusyId] = useState<string | null>(null);
+  const [selectedBookIds, setSelectedBookIds] = useState<(string | number)[]>([]);
+  const [memberSearch, setMemberSearch] = useState("");
+  const [bookSearch, setBookSearch] = useState("");
+  const [borrowDate, setBorrowDate] = useState(toDateInputValue(new Date()));
+  const [dueDate, setDueDate] = useState(toDateInputValue(addDays(new Date(), 14)));
+  const [busyId, setBusyId] = useState<string | number | null>(null);
   const [returnLoan, setReturnLoan] = useState<Loan | null>(null);
+  const [detailLoan, setDetailLoan] = useState<Loan | null>(null);
   const [lateFee, setLateFee] = useState(0);
 
-  const selectedBook = availableBooks.find((b) => b.id === selectedBookId);
+  const selectedBooks = availableBooks.filter((book) =>
+    selectedBookIds.some((id) => idsEqual(id, book.id)),
+  );
+  const today = toDateInputValue(new Date());
+  const filteredMembers = activeMembers.filter((member) => {
+    const keyword = memberSearch.trim().toLowerCase();
+    if (!keyword) return true;
+    return [member.fullName, member.phone, member.email, member.cardNumber ?? ""]
+      .some((value) => startsWithSearch(value, keyword));
+  });
+  const filteredBooks = availableBooks.filter((book) => {
+    const keyword = bookSearch.trim().toLowerCase();
+    if (!keyword) return true;
+    return [book.title, book.author, String(book.id)]
+      .some((value) => startsWithSearch(value, keyword));
+  });
 
   const openDialog = () => {
-    setSelectedMemberId(activeMembers[0]?.id ?? "");
-    setSelectedBookId(availableBooks[0]?.id ?? "");
-    setSelectedQuantity(1);
+    setSelectedMemberId(activeMembers[0] ? String(activeMembers[0].id) : "");
+    setSelectedBookIds([]);
+    setMemberSearch("");
+    setBookSearch("");
+    setBorrowDate(toDateInputValue(new Date()));
+    setDueDate(toDateInputValue(addDays(new Date(), 14)));
     setDialogOpen(true);
   };
 
+  const toggleStaffBook = (bookId: string | number, checked: boolean) => {
+    setSelectedBookIds((current) => {
+      if (!checked) return current.filter((id) => !idsEqual(id, bookId));
+      if (current.some((id) => idsEqual(id, bookId))) return current;
+      return [...current, bookId];
+    });
+  };
+
   const handleCreateLoan = async () => {
-    const member = activeMembers.find((m) => m.id === selectedMemberId);
-    const book = availableBooks.find((b) => b.id === selectedBookId);
-    if (!member || !book) return;
+    const member = activeMembers.find((m) => idsEqual(m.id, selectedMemberId));
+    if (!member || selectedBooks.length === 0) return;
+    if (selectedBooks.length > MAX_SLIP_BOOKS) {
+      toast.error(t("loans.maxSelectionError", { max: MAX_SLIP_BOOKS }));
+      return;
+    }
+    if (borrowDate < today) {
+      toast.error(t("loans.borrowDatePastError"));
+      return;
+    }
+    if (dueDate < borrowDate) {
+      toast.error(t("loans.dueDateInvalid"));
+      return;
+    }
     try {
-      await createStaffLoan({
-        book,
+      await createStaffLoanSlip({
         memberId: member.id,
-        memberName: member.fullName,
-        quantity: selectedQuantity,
+        borrowDate,
+        dueDate,
+        items: selectedBooks.map((book) => ({ bookId: book.id, quantity: 1 })),
       });
       toast.success(t("loans.createSuccess"));
       setDialogOpen(false);
@@ -213,11 +277,11 @@ export default function StaffLoansPage() {
                     className="border-b border-dashed border-paper-line last:border-0 hover:bg-brass/5"
                   >
                     <td className="px-4 py-3 font-display font-medium text-ink">
-                      {loan.bookTitle}
+                      {getLoanTitleSummary(loan)}
                     </td>
                     <td className="px-4 py-3 text-ink/80">{loan.memberName}</td>
                     <td className="px-4 py-3 text-center font-mono text-ink/70">
-                      {loan.quantity}
+                      {getLoanTotalQuantity(loan)}
                     </td>
                     <td className="hidden px-4 py-3 font-mono text-ink/70 sm:table-cell">
                       {formatDate(loan.borrowDate)}
@@ -239,7 +303,7 @@ export default function StaffLoansPage() {
                           <>
                             <Button
                               size="sm"
-                              disabled={isMutating || busyId === loan.id}
+                              disabled={isMutating || idsEqual(busyId ?? "", loan.id)}
                               onClick={() => handleApproveBorrow(loan)}
                             >
                               <Check size={14} />
@@ -248,7 +312,7 @@ export default function StaffLoansPage() {
                             <Button
                               size="sm"
                               variant="danger"
-                              disabled={isMutating || busyId === loan.id}
+                              disabled={isMutating || idsEqual(busyId ?? "", loan.id)}
                               onClick={() => handleRejectBorrow(loan)}
                             >
                               <X size={14} />
@@ -260,12 +324,15 @@ export default function StaffLoansPage() {
                           <Button
                             size="sm"
                             variant="secondary"
-                            disabled={isMutating || busyId === loan.id}
+                            disabled={isMutating || idsEqual(busyId ?? "", loan.id)}
                             onClick={() => openReturnDialog(loan)}
                           >
                             {t("loans.approveReturn")}
                           </Button>
                         )}
+                        <Button size="sm" variant="ghost" onClick={() => setDetailLoan(loan)}>
+                          {t("loans.viewDetail")}
+                        </Button>
                       </div>
                     </td>
                   </tr>
@@ -283,16 +350,24 @@ export default function StaffLoansPage() {
             {activeMembers.length === 0 ? (
               <p className="text-sm text-rust">{t("loans.noEligibleMembers")}</p>
             ) : (
-              <Select
-                value={selectedMemberId}
-                onChange={(e) => setSelectedMemberId(e.target.value)}
-              >
-                {activeMembers.map((m) => (
-                  <option key={m.id} value={m.id}>
-                    {m.fullName} - {m.cardNumber}
-                  </option>
-                ))}
-              </Select>
+              <div className="space-y-2">
+                <Input
+                  value={memberSearch}
+                  onChange={(e) => setMemberSearch(e.target.value)}
+                  placeholder={t("loans.searchMemberPlaceholder")}
+                />
+                <select
+                  value={selectedMemberId}
+                  onChange={(e) => setSelectedMemberId(e.target.value)}
+                  className="focus-ring h-10 w-full rounded-xl border border-paper-line bg-white px-3 text-sm text-ink"
+                >
+                  {filteredMembers.map((m) => (
+                    <option key={m.id} value={String(m.id)}>
+                      {m.fullName} - {m.cardNumber}
+                    </option>
+                  ))}
+                </select>
+              </div>
             )}
           </div>
           <div>
@@ -300,30 +375,67 @@ export default function StaffLoansPage() {
             {availableBooks.length === 0 ? (
               <p className="text-sm text-rust">{t("loans.noEligibleBooks")}</p>
             ) : (
-              <Select value={selectedBookId} onChange={(e) => setSelectedBookId(e.target.value)}>
-                {availableBooks.map((b) => (
-                  <option key={b.id} value={b.id}>
-                    {b.title} ({b.available}/{b.quantity})
-                  </option>
-                ))}
-              </Select>
+              <div className="space-y-2">
+                <Input
+                  value={bookSearch}
+                  onChange={(e) => setBookSearch(e.target.value)}
+                  placeholder={t("loans.searchBookPlaceholder")}
+                />
+                <div className="max-h-56 space-y-2 overflow-y-auto rounded-xl border border-paper-line bg-white p-2">
+                  {filteredBooks.map((b) => (
+                    <label
+                      key={b.id}
+                      className="flex cursor-pointer items-center gap-3 rounded-lg px-2 py-2 hover:bg-brass/5"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selectedBookIds.some((id) => idsEqual(id, b.id))}
+                        onChange={(e) => toggleStaffBook(b.id, e.target.checked)}
+                        className="h-5 w-5 rounded border-paper-line accent-stacks"
+                      />
+                      <span className="min-w-0 flex-1 truncate text-sm text-ink">{b.title}</span>
+                      <span className="font-mono text-xs text-ink/60">
+                        {b.available}/{b.quantity}
+                      </span>
+                    </label>
+                  ))}
+                  {filteredBooks.length === 0 && (
+                    <div className="px-3 py-4 text-center text-sm text-ink/60">
+                      {t("loans.noSearchResults")}
+                    </div>
+                  )}
+                </div>
+              </div>
             )}
           </div>
-          <div>
-            <Label htmlFor="loanQuantity">{t("loans.quantity")}</Label>
-            <Input
-              id="loanQuantity"
-              type="number"
-              min={1}
-              max={Math.min(3, selectedBook?.available ?? 1)}
-              value={selectedQuantity}
-              onChange={(e) => {
-                const value = Number(e.target.value);
-                setSelectedQuantity(Math.max(1, Math.min(3, value || 1)));
-              }}
-            />
-            <p className="mt-1 text-xs text-ink/50">{t("loans.quantityHint")}</p>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <Label htmlFor="staffBorrowDate">{t("loans.borrowDateInput")}</Label>
+              <Input
+                id="staffBorrowDate"
+                type="date"
+                min={today}
+                value={borrowDate}
+                onChange={(e) => {
+                  setBorrowDate(e.target.value);
+                  if (dueDate < e.target.value) setDueDate(e.target.value);
+                }}
+              />
+            </div>
+            <div>
+              <Label htmlFor="staffDueDate">{t("loans.dueDateInput")}</Label>
+              <Input
+                id="staffDueDate"
+                type="date"
+                min={borrowDate}
+                value={dueDate}
+                onChange={(e) => setDueDate(e.target.value)}
+              />
+            </div>
           </div>
+          <p className="text-xs text-ink/50">
+            {t("loans.selectedForSlip", { count: selectedBooks.length, max: MAX_SLIP_BOOKS })}
+          </p>
           <div className="flex justify-end gap-2 border-t border-paper-line pt-4">
             <Button variant="ghost" onClick={() => setDialogOpen(false)}>
               {t("form.cancel")}
@@ -333,7 +445,11 @@ export default function StaffLoansPage() {
                 isMutating ||
                 activeMembers.length === 0 ||
                 availableBooks.length === 0 ||
-                selectedQuantity > (selectedBook?.available ?? 0)
+                selectedBooks.length === 0 ||
+                !borrowDate ||
+                !dueDate ||
+                borrowDate < today ||
+                new Date(dueDate).getTime() < new Date(borrowDate).getTime()
               }
               onClick={handleCreateLoan}
             >
@@ -350,11 +466,13 @@ export default function StaffLoansPage() {
       >
         <div className="space-y-4">
           <div className="rounded-xl border border-paper-line bg-paper p-3 text-sm text-ink/70">
-            <div className="font-display font-medium text-ink">{returnLoan?.bookTitle}</div>
+            <div className="font-display font-medium text-ink">
+              {returnLoan ? getLoanTitleSummary(returnLoan) : ""}
+            </div>
             <div className="mt-1">
               {t("loans.returnInfo", {
                 dueDate: formatDate(returnLoan?.dueDate ?? null),
-                quantity: returnLoan?.quantity ?? 1,
+                quantity: returnLoan ? getLoanTotalQuantity(returnLoan) : 1,
               })}
             </div>
           </div>
@@ -378,6 +496,48 @@ export default function StaffLoansPage() {
             </Button>
           </div>
         </div>
+      </Dialog>
+
+      <Dialog
+        open={!!detailLoan}
+        onClose={() => setDetailLoan(null)}
+        title={t("loans.detailTitle")}
+      >
+        {detailLoan && (
+          <div className="space-y-4 text-sm">
+            <dl className="grid gap-3 sm:grid-cols-2">
+              <div className="rounded-lg border border-paper-line bg-paper p-3">
+                <dt className="text-xs font-medium uppercase text-ink/50">{t("loans.code")}</dt>
+                <dd className="mt-1 font-mono text-ink">{detailLoan.code ?? detailLoan.id}</dd>
+              </div>
+              <div className="rounded-lg border border-paper-line bg-paper p-3">
+                <dt className="text-xs font-medium uppercase text-ink/50">{t("loans.member")}</dt>
+                <dd className="mt-1 text-ink">{detailLoan.memberName}</dd>
+              </div>
+              <div className="rounded-lg border border-paper-line bg-paper p-3">
+                <dt className="text-xs font-medium uppercase text-ink/50">{t("myLoans.borrowDate")}</dt>
+                <dd className="mt-1 font-mono text-ink">{formatDate(detailLoan.borrowDate)}</dd>
+              </div>
+              <div className="rounded-lg border border-paper-line bg-paper p-3">
+                <dt className="text-xs font-medium uppercase text-ink/50">{t("myLoans.dueDate")}</dt>
+                <dd className="mt-1 font-mono text-ink">{formatDate(detailLoan.dueDate)}</dd>
+              </div>
+            </dl>
+            <div className="rounded-xl border border-paper-line bg-white">
+              {getLoanItems(detailLoan).map((item) => (
+                <div
+                  key={`${item.bookId}-${item.id ?? ""}`}
+                  className="flex justify-between gap-3 border-b border-dashed border-paper-line px-4 py-3 last:border-0"
+                >
+                  <span className="font-display font-medium text-ink">{item.bookTitle}</span>
+                  <span className="font-mono text-ink/70">
+                    {t("loans.quantity")}: {item.quantity}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </Dialog>
     </div>
   );

@@ -4,6 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useNavigate, Link, Navigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
+import { Home } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { Input, Label, FieldError } from "../components/ui/input";
 import { Button } from "../components/ui/button";
@@ -16,6 +17,10 @@ function buildSchema(t: (key: string) => string) {
     email: z.string().email(t("auth.errors.emailInvalid")),
     username: z.string().min(3, t("auth.errors.usernameMin")),
     password: z.string().min(4, t("auth.errors.passwordMin")),
+    confirmPassword: z.string().min(1, t("auth.errors.confirmPasswordRequired")),
+  }).refine((values) => values.password === values.confirmPassword, {
+    message: t("auth.errors.passwordMismatch"),
+    path: ["confirmPassword"],
   });
 }
 
@@ -25,6 +30,7 @@ type FormValues = {
   email: string;
   username: string;
   password: string;
+  confirmPassword: string;
 };
 
 export default function RegisterPage() {
@@ -32,6 +38,7 @@ export default function RegisterPage() {
   const { user, register: registerCustomer } = useAuth();
   const navigate = useNavigate();
   const [serverError, setServerError] = useState<string | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
 
   const schema = buildSchema(t);
   const {
@@ -49,7 +56,8 @@ export default function RegisterPage() {
   const onSubmit = handleSubmit(async (values) => {
     setServerError(null);
     try {
-      await registerCustomer(values);
+      const { confirmPassword: _confirmPassword, ...registerValues } = values;
+      await registerCustomer(registerValues);
       navigate("/search", { replace: true });
     } catch (err) {
       if (err instanceof Error && err.message === "USERNAME_TAKEN") {
@@ -103,9 +111,32 @@ export default function RegisterPage() {
           </div>
           <div>
             <Label htmlFor="password">{t("auth.password")}</Label>
-            <Input id="password" type="password" {...register("password")} />
+            <Input
+              id="password"
+              type={showPassword ? "text" : "password"}
+              {...register("password")}
+            />
             <FieldError>{errors.password?.message}</FieldError>
           </div>
+          <div>
+            <Label htmlFor="confirmPassword">{t("auth.confirmPassword")}</Label>
+            <Input
+              id="confirmPassword"
+              type={showPassword ? "text" : "password"}
+              {...register("confirmPassword")}
+            />
+            <FieldError>{errors.confirmPassword?.message}</FieldError>
+          </div>
+
+          <label className="flex cursor-pointer items-center gap-3 text-sm font-medium text-stacks-dark">
+            <input
+              type="checkbox"
+              checked={showPassword}
+              onChange={(e) => setShowPassword(e.target.checked)}
+              className="h-5 w-5 rounded border-paper-line accent-stacks"
+            />
+            {t("auth.showPassword")}
+          </label>
 
           <FieldError>{serverError ?? undefined}</FieldError>
 
@@ -119,7 +150,17 @@ export default function RegisterPage() {
               {t("auth.login")}
             </Link>
           </p>
+
         </form>
+
+        <button
+          type="button"
+          className="focus-ring mt-4 inline-flex items-center gap-2 rounded-xl border border-white/30 bg-white/10 px-4 py-2 text-sm font-medium text-white backdrop-blur-sm transition-colors hover:bg-white/20"
+          onClick={() => navigate("/")}
+        >
+          <Home size={14} />
+          {t("auth.backHome")}
+        </button>
       </div>
     </div>
   );

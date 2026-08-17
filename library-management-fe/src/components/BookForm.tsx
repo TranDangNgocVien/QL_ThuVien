@@ -2,7 +2,7 @@ import { useFieldArray, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useTranslation } from "react-i18next";
-import { Plus, X } from "lucide-react";
+import { ImagePlus, Plus, X } from "lucide-react";
 import { Button } from "./ui/button";
 import { Input, Label, FieldError, Textarea } from "./ui/input";
 import { Select } from "./ui/select";
@@ -33,6 +33,8 @@ function buildSchema(t: (key: string) => string) {
       quantity: z.coerce.number().int().min(0, t("form.errors.quantityMin")),
       available: z.coerce.number().int().min(0, t("form.errors.quantityMin")),
       isbn: z.string().optional(),
+      description: z.string().optional(),
+      imageUrl: z.string().optional(),
       note: z.string().optional(),
       tags: z.array(z.object({ value: z.string().min(1) })).optional(),
     })
@@ -66,6 +68,8 @@ export function BookForm({
     register,
     control,
     handleSubmit,
+    setValue,
+    watch,
     formState: { errors },
   } = useForm<FormValues, unknown, FormOutput>({
     resolver: zodResolver(schema),
@@ -78,6 +82,14 @@ export function BookForm({
           quantity: defaultValues.quantity,
           available: defaultValues.available,
           isbn: defaultValues.isbn ?? "",
+          description: defaultValues.description ?? defaultValues.summary ?? "",
+          imageUrl:
+            defaultValues.imageUrl ??
+            defaultValues.coverImageUrl ??
+            defaultValues.coverUrl ??
+            defaultValues.thumbnailUrl ??
+            defaultValues.image ??
+            "",
           note: defaultValues.note ?? "",
           tags: (defaultValues.tags ?? []).map((value) => ({ value })),
         }
@@ -89,12 +101,28 @@ export function BookForm({
           quantity: 1,
           available: 1,
           isbn: "",
+          description: "",
+          imageUrl: "",
           note: "",
           tags: [],
         },
   });
 
   const { fields, append, remove } = useFieldArray({ control, name: "tags" });
+  const imageUrl = watch("imageUrl");
+
+  const handleImageFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === "string") {
+        setValue("imageUrl", reader.result, { shouldDirty: true, shouldValidate: true });
+      }
+    };
+    reader.readAsDataURL(file);
+  };
 
   const submit = handleSubmit(async (values) => {
     await onSubmit({
@@ -105,6 +133,8 @@ export function BookForm({
       quantity: values.quantity,
       available: values.available,
       isbn: values.isbn || undefined,
+      description: values.description || undefined,
+      imageUrl: values.imageUrl || undefined,
       note: values.note || undefined,
       tags: (values.tags ?? [])
         .map((tag: { value: string }) => tag.value)
@@ -163,6 +193,32 @@ export function BookForm({
           <Input id="isbn" {...register("isbn")} />
         </div>
 
+        <div className="col-span-2">
+          <Label htmlFor="imageUrl">{t("form.imageUrlLabel")}</Label>
+          <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
+            <Input id="imageUrl" type="text" {...register("imageUrl")} />
+            <label className="focus-ring inline-flex h-10 cursor-pointer items-center justify-center gap-2 rounded-xl border border-stacks/30 px-3 text-sm font-medium text-stacks-dark hover:bg-stacks/5">
+              <ImagePlus size={15} />
+              {t("form.chooseImage")}
+              <input
+                type="file"
+                accept="image/*"
+                className="sr-only"
+                onChange={handleImageFileChange}
+              />
+            </label>
+          </div>
+          {imageUrl && (
+            <div className="mt-2 h-28 w-20 overflow-hidden rounded-lg border border-paper-line bg-white">
+              <img
+                src={imageUrl}
+                alt={t("form.imagePreview")}
+                className="h-full w-full object-cover"
+              />
+            </div>
+          )}
+        </div>
+
         <div>
           <Label htmlFor="quantity">{t("form.quantityLabel")}</Label>
           <Input id="quantity" type="number" {...register("quantity")} />
@@ -174,6 +230,11 @@ export function BookForm({
           <Input id="available" type="number" {...register("available")} />
           <FieldError>{errors.available?.message}</FieldError>
         </div>
+      </div>
+
+      <div>
+        <Label htmlFor="description">{t("form.descriptionLabel")}</Label>
+        <Textarea id="description" rows={3} {...register("description")} />
       </div>
 
       <div>

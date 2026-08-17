@@ -1,8 +1,17 @@
-export type MemberStatus = "pending" | "active" | "suspended";
+// Định nghĩa Enum hỗ trợ cả định dạng Spring Boot (viết hoa) và FE (viết thường)
+export type MemberStatus =
+  | "PENDING"
+  | "ACTIVE"
+  | "SUSPENDED"
+  | "BLOCKED"
+  | "pending"
+  | "active"
+  | "suspended"
+  | "blocked";
 
 export interface Member {
-  id: string;
-  userId: string;
+  id: number | string;
+  userId?: number | string;
   fullName: string;
   phone: string;
   email: string;

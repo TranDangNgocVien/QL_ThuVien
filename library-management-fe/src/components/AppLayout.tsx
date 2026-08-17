@@ -1,13 +1,16 @@
 import { Link, NavLink, Outlet } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { BookMarked, LogIn, LogOut, UserPlus } from "lucide-react";
+import { useState } from "react";
 import { useAuth } from "../context/AuthContext";
 import { LanguageSwitcher } from "./LanguageSwitcher";
 import { cn } from "../lib/utils";
+import { ConfirmDialog } from "./ui/dialog";
 
 export function AppLayout() {
   const { t } = useTranslation();
   const { user, logout } = useAuth();
+  const [confirmLogoutOpen, setConfirmLogoutOpen] = useState(false);
 
   const staffLinks = [
     { to: "/staff/books", label: t("nav.books") },
@@ -18,6 +21,7 @@ export function AppLayout() {
 
   const customerLinks = [
     { to: "/search", label: t("nav.search") },
+    { to: "/cart", label: t("nav.cart") },
     { to: "/my-loans", label: t("nav.myLoans") },
   ];
 
@@ -51,7 +55,7 @@ export function AppLayout() {
                     </div>
                   </div>
                   <button
-                    onClick={logout}
+                    onClick={() => setConfirmLogoutOpen(true)}
                     aria-label={t("auth.logout")}
                     className="focus-ring rounded-xl p-2 text-white/70 hover:bg-white/10 hover:text-white"
                   >
@@ -106,6 +110,19 @@ export function AppLayout() {
       <main className="mx-auto max-w-6xl space-y-4 px-4 py-6 sm:px-6">
         <Outlet />
       </main>
+
+      <ConfirmDialog
+        open={confirmLogoutOpen}
+        title={t("auth.logoutConfirmTitle")}
+        body={t("auth.logoutConfirmBody")}
+        confirmLabel={t("auth.logout")}
+        cancelLabel={t("confirm.cancel")}
+        onConfirm={() => {
+          setConfirmLogoutOpen(false);
+          logout();
+        }}
+        onCancel={() => setConfirmLogoutOpen(false)}
+      />
     </div>
   );
 }

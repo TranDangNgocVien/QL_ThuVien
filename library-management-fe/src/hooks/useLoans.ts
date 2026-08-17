@@ -3,15 +3,20 @@ import {
   approveBorrowBook,
   approveReturnBook,
   createStaffLoan,
+  createStaffLoanSlip,
   fetchLoans,
+  fetchMyLoans,
   rejectBorrowBook,
   requestBorrowBook,
+  requestBorrowSlip,
   requestReturnBook,
   type LoanQueryParams,
 } from "../api/loansApi";
-import type { Book } from "../types/book";
-import type { Loan } from "../types/loan";
+import type { Loan, LoanSlipInput } from "../types/loan";
 
+/**
+ * Hook danh cho Thủ thư hoặc quản lý danh sách phiếu mượn chung
+ */
 export function useLoans(params: LoanQueryParams = {}) {
   const queryClient = useQueryClient();
 
@@ -21,61 +26,81 @@ export function useLoans(params: LoanQueryParams = {}) {
     staleTime: 5_000,
   });
 
-  // Mượn/trả sách đều làm thay đổi số bản còn lại (available) nên phải
-  // invalidate cả "loans" lẫn "books" để đồng bộ dữ liệu trên toàn bộ ứng dụng.
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ["loans"] });
+    queryClient.invalidateQueries({ queryKey: ["my-loans"] });
     queryClient.invalidateQueries({ queryKey: ["books"] });
   };
 
   const requestBorrowMutation = useMutation({
     mutationFn: ({
-      book,
-      memberId,
-      memberName,
-      quantity,
+      bookId,
+      quantity = 1,
     }: {
-      book: Book;
-      memberId: string;
-      memberName: string;
-      quantity: number;
-    }) => requestBorrowBook(book, memberId, memberName, quantity),
+      bookId: string | number;
+      quantity?: number;
+    }) => requestBorrowBook(bookId, quantity),
     onSuccess: invalidate,
   });
 
   const createStaffLoanMutation = useMutation({
     mutationFn: ({
-      book,
+      bookId,
       memberId,
-      memberName,
-      quantity,
+      quantity = 1,
     }: {
-      book: Book;
-      memberId: string;
-      memberName: string;
-      quantity: number;
-    }) => createStaffLoan(book, memberId, memberName, quantity),
+      bookId: string | number;
+      memberId: string | number;
+      quantity?: number;
+    }) => createStaffLoan(bookId, memberId, quantity),
+    onSuccess: invalidate,
+  });
+
+  const requestBorrowSlipMutation = useMutation({
+    mutationFn: (input: LoanSlipInput) => requestBorrowSlip(input),
+    onSuccess: invalidate,
+  });
+
+  const createStaffLoanSlipMutation = useMutation({
+    mutationFn: (input: LoanSlipInput) => createStaffLoanSlip(input),
     onSuccess: invalidate,
   });
 
   const approveBorrowMutation = useMutation({
-    mutationFn: (loan: Loan) => approveBorrowBook(loan),
+    mutationFn: (loanOrId: Loan | string | number) => {
+      const id = typeof loanOrId === "object" ? loanOrId.id : loanOrId;
+      return approveBorrowBook(id);
+    },
     onSuccess: invalidate,
   });
 
   const rejectBorrowMutation = useMutation({
-    mutationFn: (loan: Loan) => rejectBorrowBook(loan),
+    mutationFn: (loanOrId: Loan | string | number) => {
+      const id = typeof loanOrId === "object" ? loanOrId.id : loanOrId;
+      return rejectBorrowBook(id);
+    },
     onSuccess: invalidate,
   });
 
   const requestReturnMutation = useMutation({
-    mutationFn: (loan: Loan) => requestReturnBook(loan),
+    mutationFn: (loanOrId: Loan | string | number) => {
+      const id = typeof loanOrId === "object" ? loanOrId.id : loanOrId;
+      return requestReturnBook(id);
+    },
     onSuccess: invalidate,
   });
 
   const approveReturnMutation = useMutation({
-    mutationFn: ({ loan, lateFee }: { loan: Loan; lateFee: number }) =>
-      approveReturnBook(loan, lateFee),
+    mutationFn: ({
+      loan,
+      lateFee = 0,
+    }: {
+      loan: Loan | string | number;
+      lateFee?: number;
+    }) => {
+      const id = typeof loan === "object" ? loan.id : loan;
+      return approveReturnBook(id, lateFee);
+    },
     onSuccess: invalidate,
   });
 
@@ -83,17 +108,55 @@ export function useLoans(params: LoanQueryParams = {}) {
     ...query,
     loans: query.data ?? [],
     requestBorrowBook: requestBorrowMutation.mutateAsync,
+    requestBorrowSlip: requestBorrowSlipMutation.mutateAsync,
     createStaffLoan: createStaffLoanMutation.mutateAsync,
+    createStaffLoanSlip: createStaffLoanSlipMutation.mutateAsync,
     approveBorrowBook: approveBorrowMutation.mutateAsync,
     rejectBorrowBook: rejectBorrowMutation.mutateAsync,
     requestReturnBook: requestReturnMutation.mutateAsync,
     approveReturnBook: approveReturnMutation.mutateAsync,
     isMutating:
       requestBorrowMutation.isPending ||
+      requestBorrowSlipMutation.isPending ||
       createStaffLoanMutation.isPending ||
+      createStaffLoanSlipMutation.isPending ||
       approveBorrowMutation.isPending ||
       rejectBorrowMutation.isPending ||
       requestReturnMutation.isPending ||
       approveReturnMutation.isPending,
+  };
+}
+
+/**
+ * Hook dành riêng cho độc giả xem phiếu mượn của chính mình
+ */
+export function useMyLoans() {
+  const queryClient = useQueryClient();
+
+  const query = useQuery({
+    queryKey: ["my-loans"],
+    queryFn: fetchMyLoans,
+    staleTime: 5_000,
+  });
+
+  const invalidate = () => {
+    queryClient.invalidateQueries({ queryKey: ["my-loans"] });
+    queryClient.invalidateQueries({ queryKey: ["loans"] });
+    queryClient.invalidateQueries({ queryKey: ["books"] });
+  };
+
+  const returnBookMutation = useMutation({
+    mutationFn: (loanOrId: Loan | string | number) => {
+      const id = typeof loanOrId === "object" ? loanOrId.id : loanOrId;
+      return requestReturnBook(id);
+    },
+    onSuccess: invalidate,
+  });
+
+  return {
+    ...query,
+    loans: query.data ?? [],
+    requestReturnBook: returnBookMutation.mutateAsync,
+    isMutating: returnBookMutation.isPending,
   };
 }

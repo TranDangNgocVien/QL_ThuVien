@@ -10,9 +10,11 @@ import StaffLoansPage from "./pages/StaffLoansPage";
 import StaffStatsPage from "./pages/StaffStatsPage";
 import SearchPage from "./pages/SearchPage";
 import MyLoansPage from "./pages/MyLoansPage";
+import BookCartPage from "./pages/BookCartPage";
+import { BookCartProvider } from "./context/BookCartContext";
 
 // Sau khi đăng nhập, điều hướng theo vai trò: thủ thư -> quản lý sách,
-// khách hàng -> trang tìm sách.
+// độc giả -> trang tìm sách.
 function HomeRoute() {
   const { user, isLoading } = useAuth();
   if (isLoading) return null;
@@ -24,32 +26,35 @@ function HomeRoute() {
 
 export default function App() {
   return (
-    <Routes>
-      <Route path="/login" element={<LoginPage />} />
-      <Route path="/register" element={<RegisterPage />} />
+    <BookCartProvider>
+      <Routes>
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/register" element={<RegisterPage />} />
 
-      <Route element={<AppLayout />}>
-        <Route path="/search" element={<SearchPage />} />
-      </Route>
-
-      <Route element={<ProtectedRoute allowedRoles={["librarian"]} />}>
         <Route element={<AppLayout />}>
-          <Route path="/staff/books" element={<StaffBooksPage />} />
-          <Route path="/staff/members" element={<StaffMembersPage />} />
-          <Route path="/staff/loans" element={<StaffLoansPage />} />
-          <Route path="/staff/stats" element={<StaffStatsPage />} />
+          <Route path="/search" element={<SearchPage />} />
         </Route>
-      </Route>
 
-      <Route element={<ProtectedRoute allowedRoles={["customer"]} />}>
-        <Route element={<AppLayout />}>
-          <Route path="/my-loans" element={<MyLoansPage />} />
+        <Route element={<ProtectedRoute allowedRoles={["librarian"]} />}>
+          <Route element={<AppLayout />}>
+            <Route path="/staff/books" element={<StaffBooksPage />} />
+            <Route path="/staff/members" element={<StaffMembersPage />} />
+            <Route path="/staff/loans" element={<StaffLoansPage />} />
+            <Route path="/staff/stats" element={<StaffStatsPage />} />
+          </Route>
         </Route>
-      </Route>
 
-      <Route path="/" element={<HomeRoute />} />
+        <Route element={<ProtectedRoute allowedRoles={["customer"]} />}>
+          <Route element={<AppLayout />}>
+            <Route path="/cart" element={<BookCartPage />} />
+            <Route path="/my-loans" element={<MyLoansPage />} />
+          </Route>
+        </Route>
 
-      <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+        <Route path="/" element={<HomeRoute />} />
+
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </BookCartProvider>
   );
 }

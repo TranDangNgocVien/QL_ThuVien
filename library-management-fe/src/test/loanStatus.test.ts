@@ -8,7 +8,7 @@ function makeLoan(overrides: Partial<Loan>): Loan {
     bookTitle: "Sách mẫu",
     memberId: "m1",
     quantity: 1,
-    memberName: "Khách mẫu",
+    memberName: "Độc giả mẫu",
     borrowDate: "2026-01-01T00:00:00.000Z",
     dueDate: "2026-01-15T00:00:00.000Z",
     returnDate: null,

@@ -1,7 +1,7 @@
 # Thư Viện Số — Bài tập thực hành Frontend
 
 Bài tập thực hành "Quản lý Thư viện" theo Kế hoạch đào tạo Frontend, có phân quyền
-**Khách hàng** và **Nhân viên (Thủ thư)**.
+**Độc giả** và **Nhân viên (Thủ thư)**.
 
 ## Công nghệ sử dụng
 
@@ -20,7 +20,7 @@ Bài tập thực hành "Quản lý Thư viện" theo Kế hoạch đào tạo F
 
 ## Phân quyền hệ thống
 
-### Khách hàng (`role: customer`)
+### Độc giả (`role: customer`)
 - Đăng ký tài khoản (`/register`) — sau khi đăng ký, thẻ thư viện ở trạng thái
   **"Chờ lập thẻ"** cho tới khi thủ thư duyệt.
 - Tìm kiếm sách (`/search`), tự mượn sách trực tiếp nếu thẻ đang **"Đang hoạt động"**.
@@ -28,8 +28,8 @@ Bài tập thực hành "Quản lý Thư viện" theo Kế hoạch đào tạo F
 
 ### Nhân viên / Thủ thư (`role: librarian`)
 - **Quản lý sách** (`/staff/books`): CRUD đầy đủ (thêm/sửa/xoá đầu sách) — chỉ vai trò này có quyền.
-- **Thẻ thư viện** (`/staff/members`): lập thẻ cho khách hàng mới đăng ký, tạm khoá/kích hoạt lại thẻ.
-- **Mượn / Trả** (`/staff/loans`): lập phiếu mượn tại quầy cho bất kỳ khách có thẻ active,
+- **Thẻ thư viện** (`/staff/members`): lập thẻ cho độc giả mới đăng ký, tạm khoá/kích hoạt lại thẻ.
+- **Phiếu mượn** (`/staff/loans`): lập phiếu mượn tại quầy cho bất kỳ độc giả có thẻ active,
   xác nhận trả sách cho mọi phiếu mượn.
 - **Thống kê** (`/staff/stats`): tổng quan tình trạng sách (tổng đầu sách, tổng bản, đang mượn,
   quá hạn), thống kê theo thể loại, top sách mượn nhiều nhất, xuất báo cáo Excel.
@@ -39,8 +39,8 @@ Bài tập thực hành "Quản lý Thư viện" theo Kế hoạch đào tạo F
 | Vai trò | Tên đăng nhập | Mật khẩu | Ghi chú |
 |---|---|---|---|
 | Thủ thư | `thuthu` | `123456` | Toàn quyền quản trị |
-| Khách hàng (đã có thẻ) | `khach1` | `123456` | Thẻ `TV-2026-0001`, đang mượn 2 cuốn (1 cuốn quá hạn) |
-| Khách hàng (chưa có thẻ) | `khach2` | `123456` | Thử luồng "chờ thủ thư lập thẻ" |
+| Độc giả (đã có thẻ) | `khach1` | `123456` | Thẻ `TV-2026-0001`, đang mượn 2 cuốn (1 cuốn quá hạn) |
+| Độc giả (chưa có thẻ) | `khach2` | `123456` | Thử luồng "chờ thủ thư lập thẻ" |
 
 > Đây là hệ thống đăng nhập giả lập cho mục đích học tập — mật khẩu lưu dạng plain-text
 > trong `db.json`, **không dùng cách này cho sản phẩm thật**.
@@ -105,11 +105,11 @@ db.json            # dữ liệu mẫu: books, users (tài khoản), members (th
 
 ## Luồng nghiệp vụ chính
 
-1. Khách đăng ký tài khoản → hệ thống tạo hồ sơ `member` trạng thái **"Chờ lập thẻ"**.
+1. Độc giả đăng ký tài khoản → hệ thống tạo hồ sơ `member` trạng thái **"Chờ lập thẻ"**.
 2. Thủ thư vào **Thẻ thư viện**, bấm **"Lập thẻ"** → sinh số thẻ, chuyển trạng thái **"Đang hoạt động"**.
-3. Khách đăng nhập lại, vào **Tìm sách**, bấm **"Mượn sách"** → hệ thống trừ `available`,
+3. Độc giả đăng nhập lại, vào **Tìm sách**, bấm **"Mượn sách"** → hệ thống trừ `available`,
    tạo phiếu mượn với hạn trả = ngày mượn + 14 ngày.
-4. Khách tự trả sách ở **"Sách của tôi"**, hoặc thủ thư xác nhận trả tại quầy ở **Mượn / Trả**
+4. Độc giả tự trả sách ở **"Sách của tôi"**, hoặc thủ thư xác nhận trả tại quầy ở **Phiếu mượn**
    → hệ thống cộng lại `available` và đóng phiếu mượn.
 5. Trạng thái **"Quá hạn"** được tính động (so `dueDate` với thời điểm hiện tại), không cần
    tác vụ nền cập nhật.
@@ -120,3 +120,64 @@ db.json            # dữ liệu mẫu: books, users (tài khoản), members (th
 - API giả lập dùng `json-server`, có thể thay bằng API thật bằng cách đổi `baseURL` trong
   `src/api/client.ts`.
 - Có thể mở rộng thêm: upload ảnh bìa sách, thông báo email/SMS khi sách quá hạn, gia hạn mượn sách.
+
+## Dữ liệu SQL/API cần có cho chức năng phiếu mượn
+
+Frontend không tự thêm dữ liệu giả. Backend/API cần có dữ liệu thật trong SQL và trả đúng cấu trúc cho các endpoint sau:
+
+### Bảng `users`
+
+Các cột tối thiểu: `id`, `username`, `password`, `role`, `full_name`, `email`, `phone`.
+
+- `role` cần hỗ trợ `librarian` và `customer`.
+- API đăng ký/tạo độc giả nhận `username`, `password`, `fullName`, `email`, `phone`.
+
+### Bảng `members`
+
+Các cột tối thiểu: `id`, `user_id`, `full_name`, `phone`, `email`, `card_number`, `status`, `issued_date`.
+
+- `status` cần hỗ trợ `PENDING`, `ACTIVE`, `SUSPENDED`, `BLOCKED`.
+- Độc giả chỉ được lập phiếu mượn khi thẻ `ACTIVE`.
+- Thủ thư cần API sửa/xóa thông tin độc giả.
+
+### Bảng `books`
+
+Các cột tối thiểu: `id`, `title`, `author`, `category`, `published_year`, `quantity`, `available`, `isbn`, `description`, `image_url`.
+
+- `available` phải giảm khi duyệt/lập phiếu mượn và tăng lại khi xác nhận trả.
+
+### Bảng `loans`
+
+Các cột tối thiểu: `id`, `code`, `member_id`, `borrow_date`, `due_date`, `return_date`, `late_fee`, `status`, `created_at`.
+
+- `status` cần hỗ trợ `PENDING_BORROW`, `BORROWING`, `RETURN_PENDING`, `RETURNED`, `REJECTED`.
+- `borrow_date` và `due_date` lấy từ form lập phiếu, không tự cố định trên frontend.
+- `borrow_date` phải là ngày hiện tại hoặc ngày trong tương lai.
+
+### Bảng `loan_items`
+
+Các cột tối thiểu: `id`, `loan_id`, `book_id`, `quantity`.
+
+- Một phiếu mượn tối đa 3 sách.
+- API trả chi tiết phiếu nên include `items` dạng:
+
+```json
+[
+  {
+    "id": 1,
+    "loanId": 10,
+    "bookId": 5,
+    "bookTitle": "Tên sách",
+    "quantity": 1
+  }
+]
+```
+
+### Endpoint frontend đang sử dụng
+
+- `POST /auth/register`: tạo tài khoản độc giả.
+- `GET /members`, `GET /members/me`, `PATCH /members/{id}`, `DELETE /members/{id}`, `POST /members/{id}/issue-card`, `PATCH /members/{id}/status`.
+- `GET /books`, `GET /loans`, `GET /loans/my-loans`.
+- `POST /loans/borrow-slip`: độc giả lập phiếu từ giỏ sách, backend tự lấy `memberId` từ JWT.
+- `POST /loans/staff-borrow-slip`: thủ thư lập phiếu cho độc giả, body có `memberId`, `borrowDate`, `dueDate`, `items`.
+- `POST /loans/{id}/approve`, `POST /loans/{id}/reject`, `POST /loans/{id}/return`, `POST /loans/{id}/confirm-return`.

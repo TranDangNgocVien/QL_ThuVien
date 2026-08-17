@@ -1,5 +1,5 @@
 import { useTranslation } from "react-i18next";
-import { BookPlus, Pencil, Trash2 } from "lucide-react";
+import { BookPlus, Eye, Pencil, ShoppingCart, Trash2 } from "lucide-react";
 import { Button } from "./ui/button";
 import type { Book } from "../types/book";
 
@@ -12,15 +12,19 @@ interface BookTableProps {
   onEdit?: (book: Book) => void;
   onDelete?: (book: Book) => void;
   onBorrow?: (book: Book) => void;
-  /** Khách chưa có thẻ thư viện active thì không cho mượn */
+  onAddToCart?: (book: Book) => void;
+  onViewDetails?: (book: Book) => void;
+  rowClickToView?: boolean;
+  showViewButton?: boolean;
+  /** Độc giả chưa có thẻ thư viện active thì không cho mượn */
   canBorrow?: boolean;
-  borrowingBookId?: string | null;
+  borrowingBookId?: string | number | null;
   borrowLabel?: string;
+  addToCartLabel?: string;
 }
 
 function callNumber(book: Book) {
-  const prefix = book.category.slice(0, 3).toUpperCase();
-  return `${prefix}-${book.publishedYear}.${book.id.toString().slice(-3)}`;
+  return String(book.id);
 }
 
 export function BookTable({
@@ -31,9 +35,14 @@ export function BookTable({
   onEdit,
   onDelete,
   onBorrow,
+  onAddToCart,
+  onViewDetails,
+  rowClickToView = false,
+  showViewButton = true,
   canBorrow = true,
   borrowingBookId = null,
   borrowLabel,
+  addToCartLabel,
 }: BookTableProps) {
   const { t } = useTranslation();
 
@@ -84,7 +93,7 @@ export function BookTable({
             <th className="px-4 py-3 text-center font-display text-sm font-semibold">
               {t("table.available")}
             </th>
-            <th className="px-4 py-3 text-right font-display text-sm font-semibold">
+            <th className="w-40 px-4 py-3 text-right font-display text-sm font-semibold">
               {t("table.actions")}
             </th>
           </tr>
@@ -93,10 +102,23 @@ export function BookTable({
           {books.map((book) => (
             <tr
               key={book.id}
-              className="border-b border-dashed border-paper-line last:border-0 hover:bg-brass/5"
+              className={`border-b border-dashed border-paper-line last:border-0 hover:bg-brass/5 ${
+                rowClickToView && onViewDetails ? "cursor-pointer" : ""
+              }`}
+              onClick={() => {
+                if (rowClickToView) onViewDetails?.(book);
+              }}
+              onKeyDown={(event) => {
+                if (!rowClickToView || !onViewDetails) return;
+                if (event.key === "Enter" || event.key === " ") {
+                  event.preventDefault();
+                  onViewDetails(book);
+                }
+              }}
+              tabIndex={rowClickToView && onViewDetails ? 0 : undefined}
             >
               <td className="px-4 py-3">
-                <span className="stamp-badge border-brass text-brass">
+                <span className="stamp-badge max-w-28 break-all border-brass text-brass">
                   {callNumber(book)}
                 </span>
               </td>
@@ -131,11 +153,27 @@ export function BookTable({
               <td className="px-4 py-3">
                 {mode === "staff" ? (
                   <div className="flex justify-end gap-1">
+                    {showViewButton && onViewDetails && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        aria-label={t("table.view")}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          onViewDetails(book);
+                        }}
+                      >
+                        <Eye size={15} />
+                      </Button>
+                    )}
                     <Button
                       variant="ghost"
                       size="icon"
                       aria-label={t("table.edit")}
-                      onClick={() => onEdit?.(book)}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        onEdit?.(book);
+                      }}
                     >
                       <Pencil size={15} />
                     </Button>
@@ -143,28 +181,91 @@ export function BookTable({
                       variant="ghost"
                       size="icon"
                       aria-label={t("table.delete")}
-                      onClick={() => onDelete?.(book)}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        onDelete?.(book);
+                      }}
                     >
                       <Trash2 size={15} className="text-rust" />
                     </Button>
                   </div>
                 ) : (
-                  <div className="flex justify-end">
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      disabled={
-                        book.available <= 0 ||
-                        !canBorrow ||
-                        borrowingBookId === book.id
-                      }
-                      onClick={() => onBorrow?.(book)}
-                    >
-                      <BookPlus size={14} />
-                      {borrowingBookId === book.id
-                        ? t("search.borrowing")
-                        : (borrowLabel ?? t("search.borrow"))}
-                    </Button>
+                  <div className="flex flex-wrap justify-end gap-1">
+                    {showViewButton && onViewDetails && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        aria-label={t("table.view")}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          onViewDetails(book);
+                        }}
+                      >
+                        <Eye size={15} />
+                      </Button>
+                    )}
+                    {onAddToCart ? (
+                      <>
+                        <Button
+                          variant="secondary"
+                          size="icon"
+                          aria-label={
+                            borrowingBookId === book.id
+                              ? t("search.borrowing")
+                              : (borrowLabel ?? t("search.borrow"))
+                          }
+                          title={
+                            borrowingBookId === book.id
+                              ? t("search.borrowing")
+                              : (borrowLabel ?? t("search.borrow"))
+                          }
+                          disabled={
+                            book.available <= 0 ||
+                            !canBorrow ||
+                            borrowingBookId === book.id
+                          }
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            onBorrow?.(book);
+                          }}
+                        >
+                          <BookPlus size={16} />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          aria-label={addToCartLabel ?? t("search.addToCart")}
+                          title={addToCartLabel ?? t("search.addToCart")}
+                          disabled={book.available <= 0 || !canBorrow}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            onAddToCart(book);
+                          }}
+                        >
+                          <ShoppingCart size={16} />
+                        </Button>
+                      </>
+                    ) : (
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        className="h-auto min-h-8 max-w-40 whitespace-normal px-3 py-1.5 text-center leading-tight"
+                        disabled={
+                          book.available <= 0 ||
+                          !canBorrow ||
+                          borrowingBookId === book.id
+                        }
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          onBorrow?.(book);
+                        }}
+                      >
+                        <BookPlus size={14} />
+                        {borrowingBookId === book.id
+                          ? t("search.borrowing")
+                          : (borrowLabel ?? t("search.borrow"))}
+                      </Button>
+                    )}
                   </div>
                 )}
               </td>

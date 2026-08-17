@@ -6,7 +6,7 @@ import * as XLSX from "xlsx";
 import { FileDown } from "lucide-react";
 import { fetchAllBooks } from "../api/booksApi";
 import { fetchLoans } from "../api/loansApi";
-import { getLoanDisplayStatus } from "../types/loan";
+import { getLoanDisplayStatus, getLoanItems, getLoanTitleSummary } from "../types/loan";
 import type { Book, BookCategory } from "../types/book";
 import { Button } from "../components/ui/button";
 
@@ -60,11 +60,14 @@ export default function StaffStatsPage() {
   const topBorrowed = useMemo(() => {
     const counts = new Map<string, { title: string; count: number }>();
     for (const loan of loans) {
-      const existing = counts.get(loan.bookId);
-      if (existing) {
-        existing.count += 1;
-      } else {
-        counts.set(loan.bookId, { title: loan.bookTitle, count: 1 });
+      for (const item of getLoanItems(loan)) {
+        const bookId = String(item.bookId);
+        const existing = counts.get(bookId);
+        if (existing) {
+          existing.count += item.quantity;
+        } else {
+          counts.set(bookId, { title: item.bookTitle, count: item.quantity });
+        }
       }
     }
     return [...counts.values()].sort((a, b) => b.count - a.count).slice(0, 5);
@@ -93,7 +96,7 @@ export default function StaffStatsPage() {
 
     const loansSheet = XLSX.utils.json_to_sheet(
       loans.map((loan) => ({
-        [t("loans.book")]: loan.bookTitle,
+        [t("loans.book")]: getLoanTitleSummary(loan),
         [t("loans.member")]: loan.memberName,
         [t("myLoans.borrowDate")]: new Date(loan.borrowDate).toLocaleDateString(),
         [t("myLoans.dueDate")]: new Date(loan.dueDate).toLocaleDateString(),

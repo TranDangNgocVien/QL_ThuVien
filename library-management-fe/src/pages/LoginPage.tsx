@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate, Link, Navigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { BookMarked } from "lucide-react";
+import { BookMarked, Home } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { Input, Label, FieldError } from "../components/ui/input";
 import { Button } from "../components/ui/button";
@@ -14,6 +14,7 @@ export default function LoginPage() {
 
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -80,12 +81,22 @@ export default function LoginPage() {
             <Label htmlFor="password">{t("auth.password")}</Label>
             <Input
               id="password"
-              type="password"
+              type={showPassword ? "text" : "password"}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
             />
           </div>
+
+          <label className="flex cursor-pointer items-center gap-3 text-sm font-medium text-stacks-dark">
+            <input
+              type="checkbox"
+              checked={showPassword}
+              onChange={(e) => setShowPassword(e.target.checked)}
+              className="h-5 w-5 rounded border-paper-line accent-stacks"
+            />
+            {t("auth.showPassword")}
+          </label>
 
           <FieldError>{error ?? undefined}</FieldError>
 
@@ -101,6 +112,15 @@ export default function LoginPage() {
           </p>
 
         </form>
+
+        <button
+          type="button"
+          className="focus-ring mt-4 inline-flex items-center gap-2 rounded-xl border border-white/30 bg-white/10 px-4 py-2 text-sm font-medium text-white backdrop-blur-sm transition-colors hover:bg-white/20"
+          onClick={() => navigate("/")}
+        >
+          <Home size={14} />
+          {t("auth.backHome")}
+        </button>
       </div>
     </div>
   );

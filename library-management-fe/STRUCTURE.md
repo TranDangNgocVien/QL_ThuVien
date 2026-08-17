@@ -71,8 +71,8 @@ library-management-fe/
     │   ├── StaffMembersPage.tsx    →  Phần Thẻ thư viện (Nhân viên) (/staff/members)
     │   ├── StaffLoansPage.tsx      →  Phần Mượn/Trả (Nhân viên)     (/staff/loans)
     │   ├── StaffStatsPage.tsx      →  Phần Thống kê (Nhân viên)     (/staff/stats)
-    │   ├── SearchPage.tsx          →  Phần Tìm & Mượn sách (Khách)  (/search)
-    │   └── MyLoansPage.tsx         →  Phần Mượn/Trả (Khách)         (/my-loans)
+    │   ├── SearchPage.tsx          →  Phần Tìm & Mượn sách (Độc giả)  (/search)
+    │   └── MyLoansPage.tsx         →  Phần Mượn/Trả (Độc giả)         (/my-loans)
     │
     ├── locales/                    # ─── Đa ngôn ngữ ───
     │   ├── vi.json                  —  Toàn bộ chuỗi Tiếng Việt
@@ -94,8 +94,8 @@ library-management-fe/
 |---|---|---|---|
 | Đăng nhập / Đăng ký | `/login`, `/register` | Chưa đăng nhập | `pages/LoginPage.tsx`, `pages/RegisterPage.tsx` |
 | Quản lý sách (CRUD) | `/staff/books` | Nhân viên | `pages/StaffBooksPage.tsx` |
-| Tìm & mượn sách | `/search` | Khách hàng | `pages/SearchPage.tsx` |
-| Sách của tôi (tự trả) | `/my-loans` | Khách hàng | `pages/MyLoansPage.tsx` |
+| Tìm & mượn sách | `/search` | Độc giả | `pages/SearchPage.tsx` |
+| Sách của tôi (tự trả) | `/my-loans` | Độc giả | `pages/MyLoansPage.tsx` |
 | Thẻ thư viện | `/staff/members` | Nhân viên | `pages/StaffMembersPage.tsx` |
 | Mượn / Trả tại quầy | `/staff/loans` | Nhân viên | `pages/StaffLoansPage.tsx` |
 | Thống kê + Xuất Excel | `/staff/stats` | Nhân viên | `pages/StaffStatsPage.tsx` |
